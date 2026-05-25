@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>采购大战</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d2e;
+  --card: #222540;
+  --border: rgba(255,255,255,0.08);
+  --gold: #FFD700;
+  --gold-dim: rgba(255,215,0,0.15);
+  --green: #4ade80;
+  --red: #f87171;
+  --blue: #60a5fa;
+  --text: #e2e8f0;
+  --text-dim: #64748b;
+  --accent: #6366f1;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+body { display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+
+/* ── screens ── */
+.screen { display: none; width: 100%; max-width: 500px; padding: 20px 16px 40px; flex-direction: column; gap: 14px; }
+.screen.active { display: flex; }
+
+h1 { font-size: 28px; font-weight: 900; text-align: center; color: var(--gold); text-shadow: 0 0 20px rgba(255,215,0,0.4); margin-bottom: 4px; }
+.subtitle { text-align: center; font-size: 13px; color: var(--text-dim); letter-spacing: 0.1em; }
+
+/* ── cards ── */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+.card-title { font-size: 13px; color: var(--text-dim); letter-spacing: 0.1em; margin-bottom: 10px; }
+
+/* ── inputs ── */
+input[type=text], input[type=number] {
+  width: 100%; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-size: 15px; outline: none;
+  transition: border-color 0.2s;
+}
+input:focus { border-color: var(--accent); }
+
+/* ── buttons ── */
+.btn {
+  width: 100%; padding: 14px; border-radius: 12px; border: none;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+  letter-spacing: 0.05em;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-gold { background: linear-gradient(135deg, #FFB300, #FF6600); color: #000; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-red { background: rgba(248,113,113,0.2); border: 1px solid var(--red); color: var(--red); }
+.btn-green { background: rgba(74,222,128,0.2); border: 1px solid var(--green); color: var(--green); }
+.btn-sm { padding: 8px 14px; font-size: 13px; width: auto; border-radius: 8px; }
+
+/* ── role grid ── */
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.role-card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 12px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s; text-align: center;
+}
+.role-card:hover { border-color: var(--accent); }
+.role-card.selected { border-color: var(--gold); background: var(--gold-dim); }
+.role-card.taken { opacity: 0.35; cursor: not-allowed; }
+.role-emoji { font-size: 28px; margin-bottom: 4px; }
+.role-name { font-size: 14px; font-weight: 700; }
+.role-talent { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.role-desc { font-size: 11px; color: var(--blue); margin-top: 4px; line-height: 1.4; }
+
+/* ── player list ── */
+.player-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.player-item:last-child { border-bottom: none; }
+.player-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.player-info { flex: 1; }
+.player-name { font-size: 14px; font-weight: 600; }
+.player-role { font-size: 12px; color: var(--text-dim); }
+.player-coins { font-size: 13px; color: var(--gold); font-weight: 700; }
+
+/* ── top bar ── */
+.top-bar {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+  width: 100%; max-width: 500px;
+}
+.top-bar .day-badge {
+  background: var(--gold-dim); border: 1px solid rgba(255,215,0,0.3);
+  color: var(--gold); font-size: 12px; font-weight: 700;
+  padding: 3px 10px; border-radius: 20px;
+}
+.top-bar .my-coins { font-size: 18px; font-weight: 900; color: var(--gold); }
+.top-bar .my-coins span { font-size: 12px; color: var(--text-dim); font-weight: 400; }
+
+/* ── item display ── */
+.item-card {
+  background: linear-gradient(135deg, #1e2240, #2a2f50);
+  border: 1px solid rgba(99,102,241,0.4);
+  border-radius: 16px; padding: 18px; text-align: center;
+}
+.item-emoji { font-size: 36px; margin-bottom: 6px; }
+.item-name { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.item-cat { font-size: 12px; color: var(--text-dim); }
+.item-price { font-size: 28px; font-weight: 900; color: var(--gold); margin-top: 8px; }
+.item-quality { display: flex; gap: 3px; justify-content: center; margin-top: 6px; }
+.item-quality span { font-size: 14px; }
+
+/* ── bid section ── */
+.bid-section { display: flex; flex-direction: column; gap: 10px; }
+.current-bid-display { text-align: center; padding: 12px; background: var(--surface); border-radius: 12px; }
+.current-bid-label { font-size: 12px; color: var(--text-dim); }
+.current-bid-val { font-size: 26px; font-weight: 900; color: var(--gold); }
+.current-bidder { font-size: 12px; color: var(--green); margin-top: 2px; }
+.bid-input-row { display: flex; gap: 8px; }
+.bid-input-row input { flex: 1; }
+.bid-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.bid-preset { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); font-size: 12px; cursor: pointer; transition: background 0.1s; }
+.bid-preset:hover { background: var(--card); color: var(--text); }
+
+/* ── timer ── */
+.timer-bar { width: 100%; height: 6px; background: var(--border); border-radius: 6px; overflow: hidden; }
+.timer-fill { height: 100%; background: var(--green); border-radius: 6px; transition: width 0.9s linear, background 0.3s; }
+.timer-fill.urgent { background: var(--red); }
+.timer-text { text-align: center; font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+
+/* ── scoreboard ── */
+.score-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.score-item:last-child { border-bottom: none; }
+.score-rank { font-size: 20px; font-weight: 900; min-width: 28px; text-align: center; }
+.score-info { flex: 1; }
+.score-name { font-size: 14px; font-weight: 700; }
+.score-detail { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.score-coins { font-size: 16px; font-weight: 900; }
+.score-coins.pos { color: var(--green); }
+.score-coins.neg { color: var(--red); }
+
+/* ── task progress ── */
+.task-bars { display: flex; flex-direction: column; gap: 8px; }
+.task-row { }
+.task-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+.task-track { height: 8px; background: var(--border); border-radius: 8px; overflow: hidden; }
+.task-fill { height: 100%; border-radius: 8px; transition: width 0.4s ease; }
+.task-fill.transport { background: #60a5fa; }
+.task-fill.price { background: #fbbf24; }
+.task-fill.logistics { background: #a78bfa; }
+
+/* ── chat ── */
+.chat-box { height: 120px; overflow-y: auto; background: var(--surface); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.chat-msg { font-size: 12px; line-height: 1.4; }
+.chat-msg .chat-name { color: var(--blue); font-weight: 700; margin-right: 4px; }
+.chat-msg .chat-sys { color: var(--text-dim); font-style: italic; }
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input-row input { flex: 1; font-size: 13px; padding: 8px 12px; }
+
+/* ── toast ── */
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); padding: 10px 20px; border-radius: 24px;
+  font-size: 14px; font-weight: 600; z-index: 999;
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+.toast.win { border-color: var(--gold); color: var(--gold); }
+.toast.err { border-color: var(--red); color: var(--red); }
+
+/* ── phase label ── */
+.phase-label {
+  text-align: center; font-size: 12px; letter-spacing: 0.12em;
+  color: var(--text-dim); padding: 4px 0;
+}
+.phase-label strong { color: var(--accent); }
+
+/* ── result screen ── */
+.result-crown { font-size: 56px; text-align: center; margin-bottom: 8px; }
+.result-winner { font-size: 22px; font-weight: 900; text-align: center; color: var(--gold); }
+.result-sub { font-size: 13px; color: var(--text-dim); text-align: center; margin-bottom: 16px; }
+
+/* ── room code display ── */
+.room-code-display {
+  background: var(--gold-dim); border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 12px; padding: 14px; text-align: center;
+}
+.room-code-label { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+.room-code-val { font-size: 32px; font-weight: 900; color: var(--gold); letter-spacing: 0.2em; }
+.room-code-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+/* ── scholar preview ── */
+.preview-badge {
+  background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 10px; padding: 8px 12px; font-size: 12px; color: #a5b4fc;
+}
+
+@media (max-width: 360px) {
+  .role-grid { grid-template-columns: 1fr 1fr; }
+  h1 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ── SCREEN: 首页 ── -->
+<div class="screen active" id="screen-home">
+  <div style="height: 20px;"></div>
+  <h1>⚔️ 采购大战</h1>
+  <p class="subtitle">多人联机 · 竞价博弈 · 五天决胜</p>
+  <div style="height: 8px;"></div>
+
+  <div class="card">
+    <div class="card-title">你的名字</div>
+    <input type="text" id="input-name" placeholder="输入昵称" maxlength="8">
+  </div>
+
+  <button class="btn btn-gold" onclick="createRoom()">🏠 创建房间</button>
+
+  <div class="card">
+    <div class="card-title">加入房间</div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="input-room" placeholder="输入房间码" maxlength="5" style="text-transform:uppercase;letter-spacing:0.15em;">
+      <button class="btn btn-primary btn-sm" onclick="joinRoom()">加入</button>
+    </div>
+  </div>
+
+  <div class="card" style="font-size:13px;color:var(--text-dim);line-height:1.7;">
+    🎯 完成采购任务，花费最少者获胜<br>
+    🏆 竞拍物品后可向其他玩家收租<br>
+    ⚡ 五天限时，策略为王
+  </div>
+</div>
+
+<!-- ── SCREEN: 大厅 ── -->
+<div class="screen" id="screen-lobby">
+  <div style="height: 10px;"></div>
+  <h1>⚔️ 采购大战</h1>
+
+  <div class="room-code-display">
+    <div class="room-code-label">房间码（发给朋友）</div>
+    <div class="room-code-val" id="lobby-roomcode">-----</div>
+    <div class="room-code-hint">朋友在首页输入此码加入</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">选择角色</div>
+    <div class="role-grid" id="role-grid"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">玩家列表 <span id="player-count">(0/6)</span></div>
+    <div id="lobby-players"></div>
+  </div>
+
+  <button class="btn btn-gold" id="btn-start" onclick="startGame()" disabled>开始游戏（至少2人）</button>
+  <p style="font-size:12px;color:var(--text-dim);text-align:center;">所有人选好角色后，房主点击开始</p>
+</div>
+
+<!-- ── SCREEN: 游戏主界面 ── -->
+<div class="screen" id="screen-game">
+  <div class="top-bar" id="top-bar">
+    <div class="day-badge" id="day-badge">第1天</div>
+    <div style="flex:1;"></div>
+    <div>
+      <div class="my-coins"><span>💰 </span><span id="my-coins-val">10000</span></div>
+    </div>
+  </div>
+
+  <!-- 我的任务进度 -->
+  <div class="card">
+    <div class="card-title">我的任务进度（每项需达10点）</div>
+    <div class="task-bars">
+      <div class="task-row">
+        <div class="task-label"><span>🚗 交通</span><span id="prog-transport">0/10</span></div>
+        <div class="task-track"><div class="task-fill transport" id="fill-transport" style="width:0%"></div></div>
+      </div>
+      <div class="task-row">
+        <div class="task-label"><span>💰 货源</span><span id="prog-price">0/10</span></div>
+        <div class="task-track"><div class="task-fill price" id="fill-price" style="width:0%"></div></div>
+      </div>
+      <div class="task-row">
+        <div class="task-label"><span>📦 运输</span><span id="prog-logistics">0/10</span></div>
+        <div class="task-track"><div class="task-fill logistics" id="fill-logistics" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 学者预览 -->
+  <div class="preview-badge" id="scholar-preview" style="display:none">
+    📚 学者预知：明日物品 — <span id="preview-content"></span>
+  </div>
+
+  <!-- 当前拍卖物品 -->
+  <div id="auction-area">
+    <div class="phase-label" id="phase-label">等待开始...</div>
+
+    <div class="item-card" id="item-display" style="display:none">
+      <div class="item-emoji" id="item-emoji">📦</div>
+      <div class="item-name" id="item-name">—</div>
+      <div class="item-cat" id="item-cat">—</div>
+      <div class="item-quality" id="item-quality"></div>
+      <div class="item-price" id="item-price">—</div>
+    </div>
+
+    <!-- 竞拍区 -->
+    <div id="bid-area" style="display:none" class="card">
+      <div class="card-title">竞拍</div>
+      <div class="current-bid-display">
+        <div class="current-bid-label">当前最高出价</div>
+        <div class="current-bid-val" id="current-bid-val">—</div>
+        <div class="current-bidder" id="current-bidder">暂无出价</div>
+      </div>
+      <div class="timer-bar"><div class="timer-fill" id="bid-timer-fill" style="width:100%"></div></div>
+      <div class="timer-text" id="bid-timer-text">剩余 20 秒</div>
+      <div class="bid-section" id="my-bid-section">
+        <div class="bid-input-row">
+          <input type="number" id="bid-input" placeholder="输入出价">
+          <button class="btn btn-gold btn-sm" onclick="placeBid()">出价</button>
+        </div>
+        <div class="bid-presets" id="bid-presets"></div>
+      </div>
+    </div>
+
+    <!-- 定租价区（获胜者看） -->
+    <div id="rent-set-area" style="display:none" class="card">
+      <div class="card-title">🎉 你拍下了！设定租用价格</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">其他玩家将以此价格使用该物品完成任务（不可超过你的拍下价）</p>
+      <div class="bid-input-row">
+        <input type="number" id="rent-input" placeholder="输入租价">
+        <button class="btn btn-gold btn-sm" onclick="setRent()">确认</button>
+      </div>
+      <div class="timer-bar" style="margin-top:8px"><div class="timer-fill" id="rent-timer-fill" style="width:100%"></div></div>
+      <div class="timer-text" id="rent-timer-text">剩余 30 秒</div>
+    </div>
+
+    <!-- 接受/拒绝租价（其他人看） -->
+    <div id="rent-accept-area" style="display:none" class="card">
+      <div class="card-title">是否使用该服务？</div>
+      <p style="font-size:15px;color:var(--gold);font-weight:700;text-align:center;margin:8px 0;" id="rent-price-display">租价：—</p>
+      <p style="font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:12px;">接受则支付租价并完成本类任务，拒绝则跳过</p>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-green" onclick="acceptRent()">✓ 接受</button>
+        <button class="btn btn-red" onclick="declineRent()">✗ 拒绝</button>
+      </div>
+      <div class="timer-bar" style="margin-top:10px"><div class="timer-fill" id="accept-timer-fill" style="width:100%"></div></div>
+      <div class="timer-text" id="accept-timer-text">剩余 15 秒</div>
+    </div>
+  </div>
+
+  <!-- 玩家总览 -->
+  <div class="card">
+    <div class="card-title">玩家状态</div>
+    <div id="game-players"></div>
+  </div>
+
+  <!-- 聊天 -->
+  <div class="card">
+    <div class="card-title">💬 聊天</div>
+    <div class="chat-box" id="chat-box"></div>
+    <div class="chat-input-row" style="margin-top:8px">
+      <input type="text" id="chat-input" placeholder="说点什么..." maxlength="50" onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="btn btn-outline btn-sm" onclick="sendChat()">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SCREEN: 结算 ── -->
+<div class="screen" id="screen-result">
+  <div style="height: 20px;"></div>
+  <div class="result-crown">🏆</div>
+  <div class="result-winner" id="result-winner-name">—</div>
+  <div class="result-sub">花费最少，笑到最后！</div>
+
+  <div class="card">
+    <div class="card-title">最终排名</div>
+    <div id="result-list"></div>
+  </div>
+
+  <button class="btn btn-gold" onclick="goHome()">🏠 回到首页</button>
+</div>
+
+<script>
+// ── 配置 ──
+// 部署到 Render 后，将下方 WS_URL 替换为你的 Render 服务地址
+// 例如：const WS_URL = 'wss://your-app-name.onrender.com';
+const WS_URL = 'wss://YOUR_RENDER_APP.onrender.com';
+
+const ROLES = {
+  merchant: { name: '商人', emoji: '🧑‍💼', talent: '智慧', desc: '价格类竞拍出价上限+25%' },
+  driver:   { name: '司机', emoji: '🚗',    talent: '体力', desc: '交通类竞拍费用-15%' },
+  porter:   { name: '搬运工', emoji: '💪',  talent: '力量', desc: '运输类竞拍费用-15%' },
+  broker:   { name: '掮客', emoji: '🕵️',   talent: '人脉', desc: '可看到最高出价' },
+  gambler:  { name: '赌徒', emoji: '🎲',    talent: '运气', desc: '每轮随机±10%加成' },
+  scholar:  { name: '学者', emoji: '📚',    talent: '分析', desc: '可预览次日物品' },
+};
+
+const CAT_EMOJI = { transport: '🚗', price: '💰', logistics: '📦' };
+const TASK_REQ = 10;
+const BID_DURATION = 20;
+const RENT_DURATION = 30;
+const ACCEPT_DURATION = 15;
+
+let ws = null;
+let myId = null;
+let myRole = null;
+let roomId = null;
+let isOwner = false;
+let gameState = { phase: 'lobby', day: 1, myCoins: 10000, myProgress: { transport: 0, price: 0, logistics: 0 } };
+let timerInterval = null;
+let currentItem = null;
+let currentBidPrice = 0;
+let rentWinnerId = null;
+let rentSetPrice = 0;
+let myRentDecided = false;
+
+// ── Screen management ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// ── Toast ──
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── WebSocket ──
+function connect(onOpen) {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = onOpen;
+  ws.onmessage = e => handleMessage(JSON.parse(e.data));
+  ws.onerror = () => toast('连接失败，请检查网络', 'err');
+  ws.onclose = () => { if (gameState.phase !== 'ended') toast('与服务器断开连接', 'err'); };
+}
+
+function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+// ── Home actions ──
+function createRoom() {
+  const name = document.getElementById('input-name').value.trim();
+  if (!name) { toast('请输入昵称', 'err'); return; }
+  myId = 'p_' + Math.random().toString(36).slice(2, 8);
+  isOwner = true;
+  connect(() => send({ type: 'CREATE_ROOM', playerId: myId }));
+  // after room created, auto join
+  ws.addEventListener('message', function handler(e) {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ROOM_CREATED') {
+      roomId = msg.roomId;
+      ws.removeEventListener('message', handler);
+      send({ type: 'JOIN_ROOM', roomId, playerId: myId, name });
+    }
+  });
+}
+
+function joinRoom() {
+  const name = document.getElementById('input-name').value.trim();
+  const code = document.getElementById('input-room').value.trim().toUpperCase();
+  if (!name) { toast('请输入昵称', 'err'); return; }
+  if (!code) { toast('请输入房间码', 'err'); return; }
+  myId = 'p_' + Math.random().toString(36).slice(2, 8);
+  roomId = code;
+  isOwner = false;
+  connect(() => send({ type: 'JOIN_ROOM', roomId: code, playerId: myId, name }));
+}
+
+// ── Lobby actions ──
+function selectRole(role) {
+  const name = document.getElementById('input-name').value.trim() || '玩家';
+  myRole = role;
+  send({ type: 'SELECT_ROLE', role, name });
+}
+
+function startGame() { send({ type: 'START_GAME' }); }
+
+// ── Game actions ──
+function placeBid() {
+  const amount = parseInt(document.getElementById('bid-input').value);
+  if (!amount) { toast('请输入出价', 'err'); return; }
+  send({ type: 'PLACE_BID', amount });
+  document.getElementById('bid-input').value = '';
+}
+
+function setRent() {
+  const price = parseInt(document.getElementById('rent-input').value);
+  if (isNaN(price)) { toast('请输入租价', 'err'); return; }
+  send({ type: 'SET_RENT', price });
+}
+
+function acceptRent() {
+  if (myRentDecided) return;
+  myRentDecided = true;
+  // Just don't send DECLINE — server counts silence as accept
+  toast('已接受租用', 'win');
+  document.getElementById('rent-accept-area').style.display = 'none';
+}
+
+function declineRent() {
+  if (myRentDecided) return;
+  myRentDecided = true;
+  send({ type: 'DECLINE_RENT' });
+  toast('已拒绝租用');
+  document.getElementById('rent-accept-area').style.display = 'none';
+}
+
+function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  send({ type: 'CHAT', message: msg });
+  input.value = '';
+}
+
+// ── Message handler ──
+function handleMessage(msg) {
+  console.log(msg.type, msg);
+  switch (msg.type) {
+
+    case 'JOINED':
+      myId = msg.playerId;
+      document.getElementById('lobby-roomcode').textContent = msg.roomId;
+      showScreen('lobby');
+      renderRoleGrid({});
+      break;
+
+    case 'PLAYER_LIST':
+      renderLobbyPlayers(msg.players);
+      renderRoleGrid(msg.players);
+      document.getElementById('player-count').textContent = `(${msg.players.length}/6)`;
+      const allReady = msg.players.length >= 2 && msg.players.every(p => p.role);
+      document.getElementById('btn-start').disabled = !(isOwner && allReady);
+      break;
+
+    case 'ERROR':
+      toast(msg.message, 'err');
+      break;
+
+    case 'GAME_START':
+      gameState.day = msg.day;
+      gameState.myProgress = { transport: 0, price: 0, logistics: 0 };
+      updateMyCoins(10000);
+      updateDayBadge(msg.day);
+      updateGamePlayers(msg.players);
+      addChat(null, `🎮 游戏开始！共5天，完成所有采购任务，花钱最少者获胜！`);
+      showScreen('game');
+      break;
+
+    case 'DAY_START':
+      gameState.day = msg.day;
+      updateDayBadge(msg.day);
+      updateGamePlayers(msg.players);
+      addChat(null, `📅 第 ${msg.day} 天开始！今日共 ${msg.items.length} 个拍卖物品`);
+      setPhaseLabel(`第 ${msg.day} 天`, '竞拍即将开始');
+      break;
+
+    case 'DAY_END':
+      addChat(null, msg.message);
+      updateGamePlayers(msg.players);
+      break;
+
+    case 'BIDDING_START':
+      currentItem = msg.item;
+      currentBidPrice = msg.item.actualPrice;
+      showBiddingPhase(msg.item, msg.timeLeft);
+      updateGamePlayers(msg.players);
+      break;
+
+    case 'BID_UPDATE':
+      currentBidPrice = msg.amount;
+      document.getElementById('current-bid-val').textContent = msg.amount;
+      document.getElementById('current-bidder').textContent =
+        msg.playerId === myId ? '✨ 你领先！' : `领先：${msg.playerName}`;
+      addChat(null, `${msg.playerName} 出价 ${msg.amount} 💰`);
+      // update bid presets
+      updateBidPresets(msg.amount);
+      break;
+
+    case 'BIDDING_END':
+      addChat(null, msg.message);
+      updateGamePlayers(msg.players);
+      updateMyCoinsFromPlayers(msg.players);
+      if (msg.winner.id === myId) {
+        // I won, show rent setting
+        document.getElementById('bid-area').style.display = 'none';
+        document.getElementById('rent-accept-area').style.display = 'none';
+        document.getElementById('rent-set-area').style.display = 'block';
+        document.getElementById('rent-input').value = '';
+        document.getElementById('rent-input').max = msg.paidPrice;
+        setPhaseLabel('你拍下了！', '请设定租价');
+        startTimerBar('rent', RENT_DURATION);
+      } else {
+        document.getElementById('bid-area').style.display = 'none';
+        setPhaseLabel(`${msg.winner.name} 拍下`, '等待设定租价...');
+      }
+      break;
+
+    case 'NO_WINNER':
+      addChat(null, `💨 ${msg.item.name} 无人竞拍，流拍！`);
+      hideAllAuctionAreas();
+      setPhaseLabel('流拍', '准备下一个...');
+      break;
+
+    case 'RENT_SET':
+      rentSetPrice = msg.rentPrice;
+      rentWinnerId = msg.winner.id;
+      myRentDecided = false;
+      addChat(null, `${msg.winner.name} 设定租价：${msg.rentPrice} 💰`);
+      if (msg.winner.id !== myId) {
+        document.getElementById('rent-accept-area').style.display = 'block';
+        document.getElementById('rent-price-display').textContent = `租价：${msg.rentPrice} 金币`;
+        setPhaseLabel('请决定', '是否接受租用？');
+        startTimerBar('accept', ACCEPT_DURATION);
+      } else {
+        document.getElementById('rent-set-area').style.display = 'none';
+        setPhaseLabel('等待其他玩家', '决定是否接受...');
+      }
+      break;
+
+    case 'RENT_DECLINED':
+      if (msg.playerId !== myId) {
+        addChat(null, `${msg.playerName} 拒绝了租用`);
+      }
+      break;
+
+    case 'RENT_RESOLVED':
+      updateGamePlayers(msg.players);
+      updateMyCoinsFromPlayers(msg.players);
+      updateMyProgressFromPlayers(msg.players);
+      hideAllAuctionAreas();
+      const myResult = msg.results?.find(r => r.playerId === myId);
+      if (msg.winner.id === myId) {
+        const earned = msg.results?.filter(r => r.accepted).reduce((s, r) => s + r.paid, 0);
+        toast(`收到租金 +${earned} 💰`, 'win');
+      } else if (myResult) {
+        if (myResult.accepted) {
+          toast(`支付租金 -${myResult.paid} 💰`);
+          addChat(null, `你支付了 ${myResult.paid} 金币租用 ${msg.item.name}`);
+        } else {
+          addChat(null, `你拒绝了租用 ${msg.item.name}`);
+        }
+      }
+      setPhaseLabel('结算完成', '准备下一轮...');
+      break;
+
+    case 'TIMER':
+      updateTimerBar(msg.phase, msg.timeLeft);
+      break;
+
+    case 'SCHOLAR_PREVIEW':
+      const preview = msg.nextItems.map(i => `${CAT_EMOJI[i.category]}${i.name}`).join(' · ');
+      document.getElementById('scholar-preview').style.display = 'block';
+      document.getElementById('preview-content').textContent = preview;
+      break;
+
+    case 'SPY_INFO':
+      const bidList = Object.entries(msg.bids).map(([id, amt]) => `${amt}`).join(', ');
+      addChat(null, `🕵️ 掮客情报：本轮出价记录 [${bidList}]`);
+      break;
+
+    case 'CHAT':
+      addChat(msg.name, msg.message);
+      break;
+
+    case 'PLAYER_DISCONNECTED':
+      addChat(null, `⚠️ ${msg.name} 断开连接`);
+      updateGamePlayers(msg.players);
+      break;
+
+    case 'GAME_OVER':
+      showResult(msg.results, msg.winner);
+      break;
+  }
+}
+
+// ── UI helpers ──
+function renderRoleGrid(players) {
+  const takenRoles = Array.isArray(players) ? players.map(p => p.role).filter(Boolean) : [];
+  const grid = document.getElementById('role-grid');
+  grid.innerHTML = '';
+  Object.entries(ROLES).forEach(([key, role]) => {
+    const taken = takenRoles.includes(key) && myRole !== key;
+    const selected = myRole === key;
+    const div = document.createElement('div');
+    div.className = 'role-card' + (selected ? ' selected' : '') + (taken ? ' taken' : '');
+    div.innerHTML = `<div class="role-emoji">${role.emoji}</div>
+      <div class="role-name">${role.name}</div>
+      <div class="role-talent">${role.talent}</div>
+      <div class="role-desc">${role.desc}</div>`;
+    if (!taken) div.onclick = () => selectRole(key);
+    grid.appendChild(div);
+  });
+}
+
+function renderLobbyPlayers(players) {
+  const list = document.getElementById('lobby-players');
+  list.innerHTML = '';
+  players.forEach(p => {
+    const role = ROLES[p.role];
+    const div = document.createElement('div');
+    div.className = 'player-item';
+    div.innerHTML = `<div class="player-avatar">${role ? role.emoji : '👤'}</div>
+      <div class="player-info">
+        <div class="player-name">${p.name}${p.id === myId ? ' (你)' : ''}</div>
+        <div class="player-role">${role ? role.name + ' · ' + role.talent : '未选择角色'}</div>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function updateGamePlayers(players) {
+  const list = document.getElementById('game-players');
+  list.innerHTML = '';
+  players.forEach(p => {
+    const role = ROLES[p.role];
+    const div = document.createElement('div');
+    div.className = 'player-item';
+    const tasks = Object.values(p.taskProgress || {}).map((v, i) => {
+      const cats = ['transport', 'price', 'logistics'];
+      return `${CAT_EMOJI[cats[i]]}${Math.min(v, TASK_REQ)}/${TASK_REQ}`;
+    }).join(' ');
+    div.innerHTML = `<div class="player-avatar">${role ? role.emoji : '👤'}</div>
+      <div class="player-info">
+        <div class="player-name">${p.name}${p.id === myId ? ' (你)' : ''}</div>
+        <div class="player-role" style="font-size:11px">${tasks}</div>
+      </div>
+      <div class="player-coins">💰${p.coins}</div>`;
+    list.appendChild(div);
+  });
+}
+
+function updateMyCoins(val) {
+  gameState.myCoins = val;
+  document.getElementById('my-coins-val').textContent = val;
+}
+
+function updateMyCoinsFromPlayers(players) {
+  const me = players.find(p => p.id === myId);
+  if (me) updateMyCoins(me.coins);
+}
+
+function updateMyProgressFromPlayers(players) {
+  const me = players.find(p => p.id === myId);
+  if (!me) return;
+  const prog = me.taskProgress || {};
+  ['transport', 'price', 'logistics'].forEach(cat => {
+    const val = prog[cat] || 0;
+    const pct = Math.min(100, (val / TASK_REQ) * 100);
+    document.getElementById('prog-' + cat).textContent = `${Math.min(val, TASK_REQ)}/${TASK_REQ}`;
+    document.getElementById('fill-' + cat).style.width = pct + '%';
+  });
+}
+
+function updateDayBadge(day) {
+  document.getElementById('day-badge').textContent = `第 ${day} 天`;
+}
+
+function setPhaseLabel(strong, text) {
+  document.getElementById('phase-label').innerHTML = `<strong>${strong}</strong> ${text}`;
+}
+
+function showBiddingPhase(item, timeLeft) {
+  hideAllAuctionAreas();
+  currentBidPrice = item.actualPrice;
+
+  // show item
+  const emojiMap = { transport: '🚗', price: '🏭', logistics: '📦' };
+  document.getElementById('item-emoji').textContent = emojiMap[item.category] || '📦';
+  document.getElementById('item-name').textContent = item.name;
+  document.getElementById('item-cat').textContent = { transport: '交通类', price: '货源类', logistics: '运输类' }[item.category];
+  document.getElementById('item-price').textContent = `起拍价：${item.actualPrice} 💰`;
+  const stars = '⭐'.repeat(item.quality) + '☆'.repeat(4 - item.quality);
+  document.getElementById('item-quality').innerHTML = `<span style="font-size:12px;color:var(--text-dim)">品质：</span><span>${stars}</span>`;
+  document.getElementById('item-display').style.display = 'block';
+
+  // show bid area
+  document.getElementById('bid-area').style.display = 'block';
+  document.getElementById('current-bid-val').textContent = item.actualPrice;
+  document.getElementById('current-bidder').textContent = '暂无出价';
+  document.getElementById('bid-input').value = '';
+  updateBidPresets(item.actualPrice);
+
+  setPhaseLabel('竞拍中', `— ${item.name}`);
+  startTimerBar('bid', timeLeft);
+}
+
+function updateBidPresets(currentBid) {
+  const presets = document.getElementById('bid-presets');
+  presets.innerHTML = '';
+  [100, 200, 500].forEach(step => {
+    const val = currentBid + step;
+    const btn = document.createElement('button');
+    btn.className = 'bid-preset';
+    btn.textContent = `+${step} (${val})`;
+    btn.onclick = () => { document.getElementById('bid-input').value = val; };
+    presets.appendChild(btn);
+  });
+}
+
+function hideAllAuctionAreas() {
+  ['bid-area', 'rent-set-area', 'rent-accept-area'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+}
+
+function startTimerBar(type, duration) {
+  clearInterval(timerInterval);
+  let left = duration;
+  const fillId = type === 'bid' ? 'bid-timer-fill' : type === 'rent' ? 'rent-timer-fill' : 'accept-timer-fill';
+  const textId = type === 'bid' ? 'bid-timer-text' : type === 'rent' ? 'rent-timer-text' : 'accept-timer-text';
+  const fill = document.getElementById(fillId);
+  const text = document.getElementById(textId);
+  if (!fill) return;
+  fill.style.width = '100%';
+  fill.classList.remove('urgent');
+  text.textContent = `剩余 ${left} 秒`;
+  timerInterval = setInterval(() => {
+    left--;
+    const pct = Math.max(0, (left / duration) * 100);
+    fill.style.width = pct + '%';
+    text.textContent = `剩余 ${left} 秒`;
+    if (left <= 5) fill.classList.add('urgent');
+    if (left <= 0) clearInterval(timerInterval);
+  }, 1000);
+}
+
+function updateTimerBar(phase, timeLeft) {
+  const map = { bidding: ['bid-timer-fill', 'bid-timer-text', BID_DURATION], renting: ['rent-timer-fill', 'rent-timer-text', RENT_DURATION], accepting: ['accept-timer-fill', 'accept-timer-text', ACCEPT_DURATION] };
+  const [fillId, textId, dur] = map[phase] || [];
+  if (!fillId) return;
+  const fill = document.getElementById(fillId);
+  const text = document.getElementById(textId);
+  if (!fill || !text) return;
+  fill.style.width = Math.max(0, (timeLeft / dur) * 100) + '%';
+  text.textContent = `剩余 ${timeLeft} 秒`;
+  if (timeLeft <= 5) fill.classList.add('urgent');
+}
+
+function addChat(name, message) {
+  const box = document.getElementById('chat-box');
+  const div = document.createElement('div');
+  div.className = 'chat-msg';
+  if (name) {
+    div.innerHTML = `<span class="chat-name">${name}</span>${message}`;
+  } else {
+    div.innerHTML = `<span class="chat-sys">${message}</span>`;
+  }
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function showResult(results, winner) {
+  gameState.phase = 'ended';
+  document.getElementById('result-winner-name').textContent = `🥇 ${winner.name} 获胜！`;
+  const list = document.getElementById('result-list');
+  list.innerHTML = '';
+  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'];
+  results.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'score-item';
+    const taskDone = r.taskComplete ? '✅ 任务完成' : '❌ 任务未完成';
+    div.innerHTML = `<div class="score-rank">${medals[i]}</div>
+      <div class="score-info">
+        <div class="score-name">${r.name}${r.id === myId ? ' (你)' : ''} ${ROLES[r.role]?.emoji || ''}</div>
+        <div class="score-detail">花费 ${r.spent} · ${taskDone}${r.penalty ? ` · 罚款 ${r.penalty}` : ''}</div>
+      </div>
+      <div class="score-coins ${r.finalScore >= 0 ? 'pos' : 'neg'}">${r.finalScore}</div>`;
+    list.appendChild(div);
+  });
+  showScreen('result');
+}
+
+function goHome() {
+  if (ws) ws.close();
+  myId = null; myRole = null; roomId = null; isOwner = false;
+  gameState = { phase: 'lobby', day: 1, myCoins: 10000, myProgress: { transport: 0, price: 0, logistics: 0 } };
+  showScreen('home');
+}
+</script>
+</body>
+</html>
